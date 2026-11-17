@@ -1,5 +1,6 @@
 """Camada de apresentação: recebe as ações do usuário e devolve as telas."""
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -28,10 +29,15 @@ def _excluir(request, objeto, destino, mensagem_sucesso):
 
 # ---------------------------------------------------------------- Participantes
 
+PARTICIPANTES_POR_PAGINA = 25
+
+
 def participante_lista(request):
     termo = request.GET.get("q", "")
-    participantes = services.buscar_participantes(termo)
-    return render(request, "gestao/participante_lista.html", {"participantes": participantes, "termo": termo})
+    paginador = Paginator(services.buscar_participantes(termo), PARTICIPANTES_POR_PAGINA)
+    pagina = paginador.get_page(request.GET.get("pagina"))
+    contexto = {"participantes": pagina.object_list, "pagina": pagina, "termo": termo}
+    return render(request, "gestao/participante_lista.html", contexto)
 
 
 def participante_detalhe(request, pk):

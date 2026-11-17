@@ -179,6 +179,8 @@ td .acoes { margin: 0; flex-wrap: nowrap; }
 }
 .opcoes label:has(input:checked) { border-color: var(--cor-primaria); background: #e6eef8; font-weight: 600; }
 
+.paginacao { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin: 1rem 0; }
+
 .busca { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; margin-bottom: 1rem; }
 .busca .campo { flex: 1 1 240px; margin: 0; }
 
