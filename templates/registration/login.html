@@ -5,7 +5,9 @@
   <h1>Entrar no sistema</h1>
   <p>Acesso restrito aos responsáveis da associação.</p>
 
-  {% if form.errors %}
+  {% if bloqueado %}
+    <p class="erro" role="alert">✕ Muitas tentativas de acesso. Por segurança, aguarde 15 minutos e tente novamente.</p>
+  {% elif form.errors %}
     <p class="erro" role="alert">✕ Usuário ou senha incorretos. Confira os dados e tente novamente.</p>
   {% endif %}
 

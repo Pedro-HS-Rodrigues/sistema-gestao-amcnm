@@ -103,6 +103,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# RNF01: bloqueio temporário do login após tentativas erradas (gestao/seguranca.py).
+LOGIN_LIMITE_TENTATIVAS = 5
+LOGIN_BLOQUEIO_SEGUNDOS = 15 * 60
+
+# O contador de tentativas fica no cache. O cache em memória vale por processo;
+# em produção com vários processos, use um cache compartilhado (banco ou Redis).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "amcnm",
+    }
+}
+
 # Sessão: expira após 30 minutos sem atividade.
 SESSION_COOKIE_AGE = 30 * 60
 SESSION_SAVE_EVERY_REQUEST = True
