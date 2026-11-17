@@ -73,3 +73,23 @@ class EncontroForm(forms.ModelForm):
         if repetidos.exists():
             raise forms.ValidationError("Esta atividade já tem um encontro com a mesma data e horário.")
         return inicio
+
+
+PREFIXO_CHAMADA = "presenca_"
+
+
+def ler_marcacoes_da_chamada(dados):
+    """
+    Converte os campos "presenca_<id da inscrição>" da tela de chamada em {id: opção}.
+
+    Campos com sufixo que não é número são ignorados. As opções e os vínculos
+    (inscrição ativa, mesma atividade) são validados em services.registrar_presencas.
+    """
+    marcacoes = {}
+    for chave, valor in dados.items():
+        if not chave.startswith(PREFIXO_CHAMADA):
+            continue
+        sufixo = chave.removeprefix(PREFIXO_CHAMADA)
+        if sufixo.isdigit():
+            marcacoes[int(sufixo)] = valor
+    return marcacoes

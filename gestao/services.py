@@ -5,9 +5,9 @@ As telas (views) chamam estas funções; elas validam as condições de cada
 operação e usam o ORM (models) para consultar ou gravar os dados.
 """
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, ProtectedError
 
-from .models import Inscricao, Participante, Presenca
+from .models import Atividade, Encontro, Inscricao, Participante, Presenca
 
 
 class RegraDeNegocioError(Exception):
@@ -92,6 +92,12 @@ def frequencias_do_encontro(encontro):
     return dict(encontro.presencas.values_list("inscricao_id", "compareceu"))
 
 
+def linhas_da_chamada(encontro):
+    """Inscritos ativos do encontro com a frequência registrada (None = não informado)."""
+    frequencias = frequencias_do_encontro(encontro)
+    return [(inscricao, frequencias.get(inscricao.pk)) for inscricao in inscritos_do_encontro(encontro)]
+
+
 @transaction.atomic
 def registrar_presencas(encontro, marcacoes):
     """
@@ -146,3 +152,27 @@ def historico_participante(participante):
             }
         )
     return historico
+
+
+# ------------------------------------------------------------------- Exclusões
+
+MENSAGENS_COM_HISTORICO = {
+    Participante: "Este participante tem histórico e não pode ser excluído. Desative o cadastro.",
+    Atividade: "Esta atividade tem histórico e não pode ser excluída. Desative a atividade.",
+    Encontro: "Este encontro tem presenças registradas e não pode ser excluído.",
+}
+
+
+def excluir_sem_historico(objeto):
+    """
+    Exclui o registro somente se nada depender dele.
+
+    As chaves estrangeiras usam PROTECT, então o banco recusa a exclusão de
+    registros com histórico; aqui essa recusa vira uma mensagem para o usuário.
+    """
+    try:
+        with transaction.atomic():
+            objeto.delete()
+    except ProtectedError:
+        mensagem = MENSAGENS_COM_HISTORICO.get(type(objeto), "Este registro tem histórico e não pode ser excluído.")
+        raise RegraDeNegocioError(mensagem) from None

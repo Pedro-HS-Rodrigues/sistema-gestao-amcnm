@@ -1,17 +1,29 @@
 """Camada de apresentação: recebe as ações do usuário e devolve as telas."""
 from django.contrib import messages
-from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import services
-from .forms import AtividadeForm, EncontroForm, InscricaoForm, ParticipanteForm
+from .forms import AtividadeForm, EncontroForm, InscricaoForm, ParticipanteForm, ler_marcacoes_da_chamada
 from .models import Atividade, Encontro, Inscricao, Participante
 
 
 def menu(request):
     return render(request, "gestao/menu.html")
+
+
+def _excluir(request, objeto, destino, mensagem_sucesso):
+    """Fluxo comum de exclusão: confirmação (GET) e exclusão protegida (POST)."""
+    if request.method == "POST":
+        try:
+            services.excluir_sem_historico(objeto)
+        except services.RegraDeNegocioError as erro:
+            messages.error(request, str(erro))
+        else:
+            messages.success(request, mensagem_sucesso)
+        return redirect(destino)
+    return render(request, "gestao/confirmar_exclusao.html", {"objeto": objeto, "voltar": destino})
 
 
 # ---------------------------------------------------------------- Participantes
@@ -68,15 +80,7 @@ def participante_alternar_ativo(request, pk):
 
 def participante_excluir(request, pk):
     participante = get_object_or_404(Participante, pk=pk)
-    if request.method == "POST":
-        try:
-            participante.delete()
-        except ProtectedError:
-            messages.error(request, "Este participante tem histórico e não pode ser excluído. Desative o cadastro.")
-        else:
-            messages.success(request, f"Participante “{participante.nome}” excluído.")
-        return redirect("participante_lista")
-    return render(request, "gestao/confirmar_exclusao.html", {"objeto": participante, "voltar": reverse("participante_lista")})
+    return _excluir(request, participante, reverse("participante_lista"), f"Participante “{participante.nome}” excluído.")
 
 
 # ------------------------------------------------------------------ Atividades
@@ -118,15 +122,7 @@ def atividade_alternar_ativa(request, pk):
 
 def atividade_excluir(request, pk):
     atividade = get_object_or_404(Atividade, pk=pk)
-    if request.method == "POST":
-        try:
-            atividade.delete()
-        except ProtectedError:
-            messages.error(request, "Esta atividade tem histórico e não pode ser excluída. Desative a atividade.")
-        else:
-            messages.success(request, f"Atividade “{atividade.nome}” excluída.")
-        return redirect("atividade_lista")
-    return render(request, "gestao/confirmar_exclusao.html", {"objeto": atividade, "voltar": reverse("atividade_lista")})
+    return _excluir(request, atividade, reverse("atividade_lista"), f"Atividade “{atividade.nome}” excluída.")
 
 
 # ------------------------------------------------------------------ Inscrições
@@ -179,16 +175,8 @@ def encontro_form(request, atividade_pk=None, pk=None):
 
 def encontro_excluir(request, pk):
     encontro = get_object_or_404(Encontro.objects.select_related("atividade"), pk=pk)
-    atividade_pk = encontro.atividade_id
-    if request.method == "POST":
-        try:
-            encontro.delete()
-        except ProtectedError:
-            messages.error(request, "Este encontro tem presenças registradas e não pode ser excluído.")
-        else:
-            messages.success(request, "Encontro excluído.")
-        return redirect("atividade_detalhe", pk=atividade_pk)
-    return render(request, "gestao/confirmar_exclusao.html", {"objeto": encontro, "voltar": reverse("atividade_detalhe", args=[atividade_pk])})
+    destino = reverse("atividade_detalhe", args=[encontro.atividade_id])
+    return _excluir(request, encontro, destino, "Encontro excluído.")
 
 
 # -------------------------------------------------------- Registro de presença
@@ -220,32 +208,22 @@ def presenca_selecionar(request):
 def presenca_registrar(request, encontro_pk):
     """Tela 2 (parte 2): lista de inscritos e marcação manual da frequência."""
     encontro = get_object_or_404(Encontro.objects.select_related("atividade"), pk=encontro_pk)
-    inscricoes = services.inscritos_do_encontro(encontro)
 
     if request.method == "POST":
-        marcacoes = {}
-        for chave, valor in request.POST.items():
-            if chave.startswith("presenca_"):
-                try:
-                    marcacoes[int(chave.removeprefix("presenca_"))] = valor
-                except ValueError:
-                    continue
         try:
-            services.registrar_presencas(encontro, marcacoes)
+            services.registrar_presencas(encontro, ler_marcacoes_da_chamada(request.POST))
         except services.RegraDeNegocioError as erro:
             messages.error(request, str(erro))
         else:
             messages.success(request, "Presenças salvas.")
             return redirect("presenca_resultado", encontro_pk=encontro.pk)
 
-    frequencias = services.frequencias_do_encontro(encontro)
-    linhas = [(i, frequencias.get(i.pk)) for i in inscricoes]
+    linhas = services.linhas_da_chamada(encontro)
     return render(request, "gestao/presenca_form.html", {"encontro": encontro, "linhas": linhas})
 
 
 def presenca_resultado(request, encontro_pk):
     """Tela 3: confirmação e conferência do que foi registrado."""
     encontro = get_object_or_404(Encontro.objects.select_related("atividade"), pk=encontro_pk)
-    frequencias = services.frequencias_do_encontro(encontro)
-    linhas = [(i, frequencias.get(i.pk)) for i in services.inscritos_do_encontro(encontro)]
+    linhas = services.linhas_da_chamada(encontro)
     return render(request, "gestao/presenca_resultado.html", {"encontro": encontro, "linhas": linhas})
