@@ -179,7 +179,15 @@ td .acoes { margin: 0; flex-wrap: nowrap; }
 }
 .opcoes label:has(input:checked) { border-color: var(--cor-primaria); background: #e6eef8; font-weight: 600; }
 
+.paginacao { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin: 1rem 0; }
+
 .busca { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; margin-bottom: 1rem; }
 .busca .campo { flex: 1 1 240px; margin: 0; }
 
 .vazio { color: #52606d; font-style: italic; }
+
+/* Ajustes da 1ª rodada de validação */
+.botao.grande { min-height: 52px; padding: .75rem 1.5rem; font-size: 1.1rem; }
+.destaque-acao { margin: 1rem 0; }
+.lista-atalhos { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; }
+.lista-atalhos li { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }

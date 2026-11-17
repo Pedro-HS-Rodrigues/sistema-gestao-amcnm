@@ -14,12 +14,12 @@ O MVP reúne tudo em um só lugar: **cadastro único do morador**, inscrições 
 |---|---|---|
 | RF01 | Login dos responsáveis; páginas internas exigem acesso | Tela **Entrar** e botão **Sair** |
 | RF02 | Cadastro de participante (nome, nascimento, telefone opcional), com aviso de possível duplicidade | Participantes → Novo |
-| RF03 | Pesquisa por parte do nome | Participantes |
+| RF03 | Pesquisa por parte do nome, com lista paginada (25 por página) | Participantes |
 | RF04 | Cadastro de atividades (ativa/inativa) | Atividades |
 | RF05 | Inscrição única por participante e atividade; cancelamento mantém o histórico | Atividade → Inscrições |
 | RF06 | Encontros por atividade (previsto, realizado, cancelado) sem repetir data e horário | Atividade → Encontros |
-| RF07 | Lista de chamada só com inscritos ativos | Registrar presença |
-| RF08 | Registro de **Presente**, **Faltou** ou **Não informado** | Registrar presença |
+| RF07 | Lista de chamada só com inscritos ativos | Fazer chamada |
+| RF08 | Registro de **Presente**, **Faltou** ou **Não informado** | Fazer chamada |
 | RF09 | Correção da frequência sem duplicar registros | Resultado → Corrigir presenças |
 | RF10 | Histórico do morador em todas as atividades | Participante → Histórico |
 
@@ -37,7 +37,7 @@ Monolito organizado em três camadas:
 | Camada | Arquivos | Responsabilidade |
 |---|---|---|
 | Apresentação | `gestao/views.py`, `gestao/forms.py`, `templates/`, `gestao/templates/` | Recebe as ações do usuário, valida os formulários e mostra resultados e mensagens |
-| Regras de negócio | `gestao/services.py` | Inscrição, cancelamento, chamada, registro e correção de presença, histórico |
+| Regras de negócio | `gestao/services.py`, `gestao/seguranca.py` | Inscrição, cancelamento, chamada, registro e correção de presença, histórico, exclusão protegida e bloqueio de login |
 | Persistência | `gestao/models.py`, `gestao/migrations/` | Entidades, relacionamentos e restrições no banco, via ORM |
 
 ```
@@ -46,6 +46,7 @@ projeto-de-software-2026/
 ├── gestao/                  # aplicação principal
 │   ├── models.py            # persistência
 │   ├── services.py          # regras de negócio
+│   ├── seguranca.py         # bloqueio de login (RNF01)
 │   ├── views.py, forms.py   # apresentação
 │   ├── templates/gestao/    # telas
 │   ├── static/css/          # estilo
@@ -105,11 +106,12 @@ As contas dos responsáveis são criadas pela administração em `/admin/`. A se
 python manage.py test
 ```
 
-Os 32 testes cobrem login e logout, senha com hash PBKDF2, proteção CSRF, validações do cadastro, inscrição e presença duplicadas, encontro não realizado, inscrição de outra atividade, correção de frequência e histórico. Também passam no PostgreSQL 16.
+Os 46 testes cobrem login e logout, bloqueio após tentativas erradas, senha com hash PBKDF2, proteção CSRF, validações do cadastro, inscrição e presença duplicadas, encontro não realizado, inscrição de outra atividade, correção de frequência, histórico, exclusão protegida e paginação. Também passam no PostgreSQL 16.
 
 ## Segurança e privacidade
 
 - Todas as páginas exigem login (`LoginRequiredMiddleware`); senhas guardadas com PBKDF2-SHA256 (padrão do Django).
+- Após 5 tentativas de login erradas para o mesmo usuário, o acesso fica bloqueado por 15 minutos, com mensagem que não revela se a conta existe. O contador fica no cache do Django; em produção com vários processos, use um cache compartilhado (banco ou Redis).
 - Sessão expira após 30 minutos sem uso; cookies `HttpOnly` e `SameSite=Lax`, e `Secure` em produção.
 - Formulários validados no servidor; alterações só por POST com token CSRF; consultas pelo ORM (sem SQL concatenado); templates com escape automático (sem XSS).
 - Segredos (`DJANGO_SECRET_KEY`, senha do banco) ficam fora do código, em variáveis de ambiente.
@@ -122,7 +124,7 @@ Botões e campos com área mínima de 44 × 44 px, foco visível, rótulos assoc
 ## Fora do escopo e próximos passos
 
 - **Fora do escopo:** aplicativo nativo, módulo financeiro, notificações automáticas (WhatsApp, SMS, e-mail) e check-in por QR Code.
-- **Próximos passos:** bloqueio temporário após 5 tentativas de login erradas (RNF01), exportação CSV, implantação em hospedagem com PostgreSQL gerenciado, teste de desempenho do RNF03 e validação com a representante da associação.
+- **Próximos passos:** exportação CSV, implantação em hospedagem com PostgreSQL gerenciado, teste de desempenho do RNF03 e validação com a representante da associação.
 
 ## Fluxo de trabalho
 

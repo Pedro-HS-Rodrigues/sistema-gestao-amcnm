@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  testes:
+    name: Testes e cobertura (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: amcnm
+          POSTGRES_USER: amcnm
+          POSTGRES_PASSWORD: senha-so-para-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U amcnm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SECRET_KEY: chave-so-para-ci
+      DJANGO_DEBUG: "1"
+      POSTGRES_DB: amcnm
+      POSTGRES_USER: amcnm
+      POSTGRES_PASSWORD: senha-so-para-ci
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar dependências
+        run: pip install -r requirements.txt coverage
+      - name: Verificar configuração do Django
+        run: python manage.py check
+      - name: Executar testes com cobertura
+        run: |
+          coverage run --source=gestao,config manage.py test -v 1
+          coverage report --omit='*/migrations/*,*/tests.py'

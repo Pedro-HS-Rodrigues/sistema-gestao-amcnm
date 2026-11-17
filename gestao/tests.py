@@ -6,13 +6,14 @@ Rodar com:  python manage.py test
 from datetime import date, datetime, timedelta
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.db import IntegrityError, transaction
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from . import services
-from .forms import EncontroForm
+from .forms import EncontroForm, ler_marcacoes_da_chamada
 from .models import Atividade, Encontro, Inscricao, Participante, Presenca
 
 SENHA = "senha-de-teste-bem-longa"
@@ -35,6 +36,7 @@ class AcessoTests(TestCase):
     """RF01 e RNF01/RNF02."""
 
     def setUp(self):
+        cache.clear()
         self.usuario = User.objects.create_user("responsavel", password=SENHA)
 
     def test_visitante_sem_login_e_redirecionado(self):
@@ -280,3 +282,136 @@ class HistoricoTests(BaseTestCase):
         self.assertContains(resposta, "Futebol")
         self.assertContains(resposta, "Oficina de leitura")
         self.assertContains(resposta, "13/11/2026 14:00")
+
+
+@override_settings(LOGIN_LIMITE_TENTATIVAS=5)
+class BloqueioLoginTests(TestCase):
+    """RNF01: bloqueio temporário após tentativas erradas."""
+
+    def setUp(self):
+        cache.clear()
+        User.objects.create_user("responsavel", password=SENHA)
+
+    def tentar(self, senha, usuario="responsavel"):
+        return self.client.post(reverse("login"), {"username": usuario, "password": senha})
+
+    def test_sexta_tentativa_e_bloqueada_mesmo_com_senha_correta(self):
+        for _ in range(5):
+            self.assertEqual(self.tentar("errada").status_code, 200)
+        resposta = self.tentar(SENHA)
+        self.assertEqual(resposta.status_code, 429)
+        self.assertContains(resposta, "Muitas tentativas", status_code=429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_bloqueio_nao_revela_se_a_conta_existe(self):
+        for _ in range(5):
+            self.tentar("errada", usuario="ninguem")
+        resposta = self.tentar("errada", usuario="ninguem")
+        self.assertContains(resposta, "Muitas tentativas", status_code=429)
+
+    def test_maiusculas_e_espacos_contam_como_o_mesmo_usuario(self):
+        for _ in range(5):
+            self.tentar("errada", usuario="Responsavel ")
+        self.assertEqual(self.tentar(SENHA).status_code, 429)
+
+    def test_login_correto_zera_o_contador(self):
+        for _ in range(4):
+            self.tentar("errada")
+        self.assertRedirects(self.tentar(SENHA), reverse("menu"))
+        self.client.post(reverse("logout"))
+        self.tentar("errada")
+        self.assertRedirects(self.tentar(SENHA), reverse("menu"))
+
+    def test_acesso_volta_depois_que_o_bloqueio_expira(self):
+        for _ in range(5):
+            self.tentar("errada")
+        cache.clear()  # simula o fim dos 15 minutos
+        self.assertRedirects(self.tentar(SENHA), reverse("menu"))
+
+
+class RefatoracaoTests(BaseTestCase):
+    """Exclusão protegida na camada de serviços, leitura da chamada e paginação."""
+
+    def test_exclusao_com_historico_vira_mensagem_de_regra(self):
+        services.inscrever(self.ana, self.atividade)
+        with self.assertRaisesMessage(services.RegraDeNegocioError, "tem histórico"):
+            services.excluir_sem_historico(self.ana)
+        self.assertTrue(Participante.objects.filter(pk=self.ana.pk).exists())
+
+    def test_exclusao_sem_historico_remove_o_registro(self):
+        services.excluir_sem_historico(self.bia)
+        self.assertFalse(Participante.objects.filter(pk=self.bia.pk).exists())
+
+    def test_leitura_da_chamada_ignora_campos_malformados(self):
+        dados = {"presenca_7": "presente", "presenca_x": "faltou", "presenca_": "faltou", "csrfmiddlewaretoken": "t"}
+        self.assertEqual(ler_marcacoes_da_chamada(dados), {7: "presente"})
+
+    def test_lista_de_participantes_e_paginada(self):
+        Participante.objects.bulk_create(
+            [Participante(nome=f"Morador {i:02d}", data_nascimento=date(2000, 1, 1)) for i in range(30)]
+        )
+        primeira = self.client.get(reverse("participante_lista"))
+        self.assertEqual(len(primeira.context["participantes"]), 25)
+        self.assertContains(primeira, "Página 1 de 2")
+
+        segunda = self.client.get(reverse("participante_lista"), {"q": "Morador", "pagina": 2})
+        self.assertEqual(len(segunda.context["participantes"]), 5)
+        self.assertContains(segunda, "q=Morador&amp;pagina=1")
+
+
+class AjustesDaValidacaoTests(BaseTestCase):
+    """Ajustes de usabilidade da 1ª rodada de validação com a representante da associação."""
+
+    def setUp(self):
+        super().setUp()
+        services.inscrever(self.ana, self.atividade)
+        agora = timezone.now()
+        self.hoje = Encontro.objects.create(
+            atividade=self.atividade, inicio=agora, status=Encontro.Status.REALIZADO
+        )
+        self.antigo = Encontro.objects.create(
+            atividade=self.atividade, inicio=agora - timedelta(days=7), status=Encontro.Status.REALIZADO
+        )
+        self.previsto_hoje = Encontro.objects.create(
+            atividade=self.atividade, inicio=agora + timedelta(hours=1), status=Encontro.Status.PREVISTO
+        )
+
+    def test_menu_usa_o_termo_fazer_chamada(self):
+        resposta = self.client.get(reverse("menu"))
+        self.assertContains(resposta, "Fazer chamada")
+        self.assertNotContains(resposta, "Registrar presença")
+
+    def test_encontros_de_hoje_trazem_so_os_realizados_do_dia(self):
+        encontros = list(services.encontros_de_hoje(timezone.localdate()))
+        self.assertIn(self.hoje, encontros)
+        self.assertNotIn(self.antigo, encontros)
+        self.assertNotIn(self.previsto_hoje, encontros)
+
+    def test_tela_de_selecao_mostra_atalho_para_encontros_de_hoje(self):
+        resposta = self.client.get(reverse("presenca_selecionar"))
+        self.assertContains(resposta, "Encontros de hoje")
+        self.assertContains(resposta, reverse("presenca_registrar", args=[self.hoje.pk]))
+
+    def test_chamada_explica_o_nao_informado(self):
+        resposta = self.client.get(reverse("presenca_registrar", args=[self.hoje.pk]))
+        self.assertContains(resposta, "Não informado (ainda não registrado)")
+
+    def test_resultado_destaca_o_botao_corrigir_presencas(self):
+        resposta = self.client.get(reverse("presenca_resultado", args=[self.hoje.pk]))
+        self.assertContains(resposta, "botao grande")
+        self.assertContains(resposta, "Corrigir presenças")
+
+
+class BancoPelaUrlTests(TestCase):
+    def test_converte_database_url_em_configuracao_do_django(self):
+        from config.settings import banco_a_partir_da_url
+
+        cfg = banco_a_partir_da_url(
+            "postgresql://usuario:s%40nha@host.exemplo.tech/meubanco?sslmode=require&channel_binding=require"
+        )
+        self.assertEqual(cfg["NAME"], "meubanco")
+        self.assertEqual(cfg["USER"], "usuario")
+        self.assertEqual(cfg["PASSWORD"], "s@nha")
+        self.assertEqual(cfg["HOST"], "host.exemplo.tech")
+        self.assertEqual(cfg["PORT"], "5432")
+        self.assertEqual(cfg["OPTIONS"], {"sslmode": "require"})

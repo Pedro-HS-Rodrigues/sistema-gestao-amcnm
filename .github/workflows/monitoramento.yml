@@ -1,0 +1,26 @@
+name: Monitoramento
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  verificar-disponibilidade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar a aplicação em produção
+        run: |
+          URL="https://sistema-gestao-amcnm.onrender.com/entrar/"
+          for tentativa in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$URL" || true)
+            echo "Tentativa $tentativa: HTTP $STATUS em $URL"
+            if [ "$STATUS" = "200" ]; then
+              echo "Status UP: aplicação disponível."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Status DOWN: aplicação indisponível."
+          exit 1

@@ -17,6 +17,7 @@
 </form>
 
 {% if participantes %}
+  <p>{{ pagina.paginator.count }} participante{{ pagina.paginator.count|pluralize }}{% if termo %} encontrado{{ pagina.paginator.count|pluralize }} para “{{ termo }}”{% endif %}.</p>
   <div class="tabela-rolagem">
     <table>
       <caption class="pular">Lista de participantes</caption>
@@ -46,6 +47,18 @@
       </tbody>
     </table>
   </div>
+
+  {% if pagina.has_other_pages %}
+    <nav class="paginacao" aria-label="Páginas da lista de participantes">
+      {% if pagina.has_previous %}
+        <a class="botao secundario" href="?{% if termo %}q={{ termo|urlencode }}&amp;{% endif %}pagina={{ pagina.previous_page_number }}">← Anterior</a>
+      {% endif %}
+      <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+      {% if pagina.has_next %}
+        <a class="botao secundario" href="?{% if termo %}q={{ termo|urlencode }}&amp;{% endif %}pagina={{ pagina.next_page_number }}">Próxima →</a>
+      {% endif %}
+    </nav>
+  {% endif %}
 {% else %}
   <p class="vazio">{% if termo %}Nenhum participante encontrado para “{{ termo }}”.{% else %}Nenhum participante cadastrado ainda.{% endif %}</p>
 {% endif %}

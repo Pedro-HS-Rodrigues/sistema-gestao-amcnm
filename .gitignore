@@ -16,3 +16,10 @@ media/
 .vscode/
 .idea/
 .DS_Store
+.env.local
+.env.*
+!.env.example
+.neon
+node_modules/
+node_modules/
+.neon/
