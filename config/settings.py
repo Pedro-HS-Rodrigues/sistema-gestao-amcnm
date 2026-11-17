@@ -6,6 +6,7 @@ nunca do código.
 """
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, unquote, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # serve o CSS em produção
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -70,9 +72,31 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# Banco de dados: PostgreSQL (planejado) quando POSTGRES_DB estiver definido;
-# caso contrário, SQLite para testes rápidos no desenvolvimento.
-if os.environ.get("POSTGRES_DB"):
+def banco_a_partir_da_url(url):
+    """Converte uma DATABASE_URL (ex.: a do Neon) na configuração do Django."""
+    partes = urlparse(url)
+    opcoes = dict(parse_qsl(partes.query))
+    opcoes.pop("channel_binding", None)  # parâmetro não usado pelo Django
+    com_pooler = "-pooler" in (partes.hostname or "")  # PgBouncer em modo transação
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": unquote(partes.path.lstrip("/")),
+        "USER": unquote(partes.username or ""),
+        "PASSWORD": unquote(partes.password or ""),
+        "HOST": partes.hostname or "localhost",
+        "PORT": str(partes.port or 5432),
+        "OPTIONS": opcoes,
+        "CONN_MAX_AGE": 0 if com_pooler else 60,
+        "DISABLE_SERVER_SIDE_CURSORS": com_pooler,
+    }
+
+
+# Banco de dados: PostgreSQL pela DATABASE_URL (produção, ex.: Neon) ou pelas
+# variáveis POSTGRES_* (planejado); sem nenhuma delas, SQLite para testes
+# rápidos no desenvolvimento.
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {"default": banco_a_partir_da_url(os.environ["DATABASE_URL"])}
+elif os.environ.get("POSTGRES_DB"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -146,5 +170,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

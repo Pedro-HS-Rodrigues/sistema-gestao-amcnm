@@ -400,3 +400,18 @@ class AjustesDaValidacaoTests(BaseTestCase):
         resposta = self.client.get(reverse("presenca_resultado", args=[self.hoje.pk]))
         self.assertContains(resposta, "botao grande")
         self.assertContains(resposta, "Corrigir presenças")
+
+
+class BancoPelaUrlTests(TestCase):
+    def test_converte_database_url_em_configuracao_do_django(self):
+        from config.settings import banco_a_partir_da_url
+
+        cfg = banco_a_partir_da_url(
+            "postgresql://usuario:s%40nha@host.exemplo.tech/meubanco?sslmode=require&channel_binding=require"
+        )
+        self.assertEqual(cfg["NAME"], "meubanco")
+        self.assertEqual(cfg["USER"], "usuario")
+        self.assertEqual(cfg["PASSWORD"], "s@nha")
+        self.assertEqual(cfg["HOST"], "host.exemplo.tech")
+        self.assertEqual(cfg["PORT"], "5432")
+        self.assertEqual(cfg["OPTIONS"], {"sslmode": "require"})
