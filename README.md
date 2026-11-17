@@ -18,8 +18,8 @@ O MVP reúne tudo em um só lugar: **cadastro único do morador**, inscrições 
 | RF04 | Cadastro de atividades (ativa/inativa) | Atividades |
 | RF05 | Inscrição única por participante e atividade; cancelamento mantém o histórico | Atividade → Inscrições |
 | RF06 | Encontros por atividade (previsto, realizado, cancelado) sem repetir data e horário | Atividade → Encontros |
-| RF07 | Lista de chamada só com inscritos ativos | Registrar presença |
-| RF08 | Registro de **Presente**, **Faltou** ou **Não informado** | Registrar presença |
+| RF07 | Lista de chamada só com inscritos ativos | Fazer chamada |
+| RF08 | Registro de **Presente**, **Faltou** ou **Não informado** | Fazer chamada |
 | RF09 | Correção da frequência sem duplicar registros | Resultado → Corrigir presenças |
 | RF10 | Histórico do morador em todas as atividades | Participante → Histórico |
 
@@ -106,7 +106,7 @@ As contas dos responsáveis são criadas pela administração em `/admin/`. A se
 python manage.py test
 ```
 
-Os 41 testes cobrem login e logout, bloqueio após tentativas erradas, senha com hash PBKDF2, proteção CSRF, validações do cadastro, inscrição e presença duplicadas, encontro não realizado, inscrição de outra atividade, correção de frequência, histórico, exclusão protegida e paginação. Também passam no PostgreSQL 16.
+Os 46 testes cobrem login e logout, bloqueio após tentativas erradas, senha com hash PBKDF2, proteção CSRF, validações do cadastro, inscrição e presença duplicadas, encontro não realizado, inscrição de outra atividade, correção de frequência, histórico, exclusão protegida e paginação. Também passam no PostgreSQL 16.
 
 ## Segurança e privacidade
 

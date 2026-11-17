@@ -6,6 +6,7 @@ operação e usam o ORM (models) para consultar ou gravar os dados.
 """
 from django.db import transaction
 from django.db.models import Prefetch, ProtectedError
+from django.utils import timezone
 
 from .models import Atividade, Encontro, Inscricao, Participante, Presenca
 
@@ -76,6 +77,12 @@ def participantes_disponiveis(atividade):
 # Opções da chamada e o valor gravado em Presenca.compareceu
 # (None = não informado: nenhum registro é mantido).
 OPCOES_FREQUENCIA = {"presente": True, "faltou": False, "nao_informado": None}
+
+
+def encontros_de_hoje(hoje=None):
+    """Encontros realizados na data informada (padrão: hoje), prontos para a chamada."""
+    hoje = hoje or timezone.localdate()
+    return Encontro.objects.filter(status=Encontro.Status.REALIZADO, inicio__date=hoje).select_related("atividade").order_by("inicio")
 
 
 def inscritos_do_encontro(encontro):

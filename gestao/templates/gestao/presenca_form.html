@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block titulo %}Registrar presença{% endblock %}
+{% block titulo %}Fazer chamada{% endblock %}
 {% block conteudo %}
-<h1>Registrar presença</h1>
+<h1>Fazer chamada</h1>
 <p>
   Atividade: <strong>{{ encontro.atividade.nome }}</strong><br>
   Encontro: <strong>{{ encontro.inicio|date:"d/m/Y H:i" }}</strong> ({{ encontro.get_status_display }})
@@ -17,12 +17,12 @@
 {% if linhas %}
   <form method="post" class="chamada">
     {% csrf_token %}
-    <p>Marque a frequência de cada inscrito. “Não informado” significa que ainda não foi registrada.</p>
+    <p>Marque a frequência de cada inscrito. “Não informado” quer dizer que a presença ainda não foi registrada.</p>
     {% for inscricao, compareceu in linhas %}
       <fieldset>
         <legend>{{ inscricao.participante.nome }}</legend>
         <div class="opcoes">
-          <label><input type="radio" name="presenca_{{ inscricao.pk }}" value="nao_informado" {% if compareceu is None %}checked{% endif %}> Não informado</label>
+          <label><input type="radio" name="presenca_{{ inscricao.pk }}" value="nao_informado" {% if compareceu is None %}checked{% endif %}> Não informado (ainda não registrado)</label>
           <label><input type="radio" name="presenca_{{ inscricao.pk }}" value="presente" {% if compareceu is True %}checked{% endif %}> ✓ Presente</label>
           <label><input type="radio" name="presenca_{{ inscricao.pk }}" value="faltou" {% if compareceu is False %}checked{% endif %}> — Faltou</label>
         </div>

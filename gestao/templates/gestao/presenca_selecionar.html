@@ -1,7 +1,21 @@
 {% extends "base.html" %}
-{% block titulo %}Registrar presença{% endblock %}
+{% block titulo %}Fazer chamada{% endblock %}
 {% block conteudo %}
-<h1>Registrar presença</h1>
+<h1>Fazer chamada</h1>
+
+{% if encontros_hoje %}
+<section class="cartao" aria-labelledby="titulo-hoje">
+  <h2 id="titulo-hoje">Encontros de hoje</h2>
+  <ul class="lista-atalhos">
+    {% for e in encontros_hoje %}
+      <li>
+        <a class="botao" href="{% url 'presenca_registrar' e.pk %}">Fazer chamada<span class="pular"> de {{ e.atividade.nome }}</span></a>
+        <span>{{ e.atividade.nome }} · {{ e.inicio|date:"H:i" }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 
 <section class="cartao">
   <form method="get" class="formulario">

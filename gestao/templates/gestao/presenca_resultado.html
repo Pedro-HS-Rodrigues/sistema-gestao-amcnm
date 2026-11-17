@@ -7,6 +7,10 @@
   Encontro: <strong>{{ encontro.inicio|date:"d/m/Y H:i" }}</strong>
 </p>
 
+<div class="acoes destaque-acao">
+  <a class="botao grande" href="{% url 'presenca_registrar' encontro.pk %}">✎ Corrigir presenças</a>
+</div>
+
 <div class="tabela-rolagem">
   <table>
     <thead>
@@ -31,7 +35,6 @@
 </div>
 
 <div class="acoes">
-  <a class="botao" href="{% url 'presenca_registrar' encontro.pk %}">Corrigir presenças</a>
   <a class="botao secundario" href="{% url 'presenca_selecionar' %}?atividade={{ encontro.atividade.pk }}">Registrar outro encontro</a>
   <a class="botao secundario" href="{% url 'menu' %}">Voltar ao menu</a>
 </div>

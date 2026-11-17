@@ -207,7 +207,12 @@ def presenca_selecionar(request):
             return redirect("presenca_registrar", encontro_pk=encontro.pk)
         messages.error(request, "Selecione um encontro para continuar.")
 
-    contexto = {"atividades": atividades, "atividade": atividade, "encontros": encontros}
+    contexto = {
+        "atividades": atividades,
+        "atividade": atividade,
+        "encontros": encontros,
+        "encontros_hoje": services.encontros_de_hoje(),
+    }
     return render(request, "gestao/presenca_selecionar.html", contexto)
 
 

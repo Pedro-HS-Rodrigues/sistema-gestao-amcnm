@@ -357,3 +357,46 @@ class RefatoracaoTests(BaseTestCase):
         segunda = self.client.get(reverse("participante_lista"), {"q": "Morador", "pagina": 2})
         self.assertEqual(len(segunda.context["participantes"]), 5)
         self.assertContains(segunda, "q=Morador&amp;pagina=1")
+
+
+class AjustesDaValidacaoTests(BaseTestCase):
+    """Ajustes de usabilidade da 1ª rodada de validação com a representante da associação."""
+
+    def setUp(self):
+        super().setUp()
+        services.inscrever(self.ana, self.atividade)
+        agora = timezone.now()
+        self.hoje = Encontro.objects.create(
+            atividade=self.atividade, inicio=agora, status=Encontro.Status.REALIZADO
+        )
+        self.antigo = Encontro.objects.create(
+            atividade=self.atividade, inicio=agora - timedelta(days=7), status=Encontro.Status.REALIZADO
+        )
+        self.previsto_hoje = Encontro.objects.create(
+            atividade=self.atividade, inicio=agora + timedelta(hours=1), status=Encontro.Status.PREVISTO
+        )
+
+    def test_menu_usa_o_termo_fazer_chamada(self):
+        resposta = self.client.get(reverse("menu"))
+        self.assertContains(resposta, "Fazer chamada")
+        self.assertNotContains(resposta, "Registrar presença")
+
+    def test_encontros_de_hoje_trazem_so_os_realizados_do_dia(self):
+        encontros = list(services.encontros_de_hoje(timezone.localdate()))
+        self.assertIn(self.hoje, encontros)
+        self.assertNotIn(self.antigo, encontros)
+        self.assertNotIn(self.previsto_hoje, encontros)
+
+    def test_tela_de_selecao_mostra_atalho_para_encontros_de_hoje(self):
+        resposta = self.client.get(reverse("presenca_selecionar"))
+        self.assertContains(resposta, "Encontros de hoje")
+        self.assertContains(resposta, reverse("presenca_registrar", args=[self.hoje.pk]))
+
+    def test_chamada_explica_o_nao_informado(self):
+        resposta = self.client.get(reverse("presenca_registrar", args=[self.hoje.pk]))
+        self.assertContains(resposta, "Não informado (ainda não registrado)")
+
+    def test_resultado_destaca_o_botao_corrigir_presencas(self):
+        resposta = self.client.get(reverse("presenca_resultado", args=[self.hoje.pk]))
+        self.assertContains(resposta, "botao grande")
+        self.assertContains(resposta, "Corrigir presenças")
